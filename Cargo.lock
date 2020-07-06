@@ -1072,7 +1072,7 @@ dependencies = [
  "ckb-traits",
  "ckb-types",
  "ckb-vm",
- "ckb-vm-definitions",
+ "ckb-vm-definitions 0.19.3",
  "faster-hex 0.4.1",
  "goblin",
  "proptest",
@@ -1305,20 +1305,23 @@ dependencies = [
 
 [[package]]
 name = "ckb-vm"
-version = "0.19.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfc2fb181a6653bb13315dc7f60fbe32cd3d697553b24687613da984faf2a2c5"
+version = "0.19.1"
+source = "git+https://github.com/xxuejie/ckb-vm?rev=255729d#255729d119bd2d1b8cbfb3347ca70762f9ebbce2"
 dependencies = [
  "byteorder",
  "bytes 0.5.6",
  "cc",
- "ckb-vm-definitions",
+ "ckb-vm-definitions 0.19.1",
  "derive_more",
  "goblin",
  "libc",
- "mapr",
- "scroll",
+ "memmap",
 ]
+
+[[package]]
+name = "ckb-vm-definitions"
+version = "0.19.1"
+source = "git+https://github.com/xxuejie/ckb-vm?rev=255729d#255729d119bd2d1b8cbfb3347ca70762f9ebbce2"
 
 [[package]]
 name = "ckb-vm-definitions"
@@ -2996,16 +2999,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mapr"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46a28a55dbc005b2f6f123c4058933d57add373d362f6fd3a76aab4fe6973500"
-dependencies = [
- "libc",
- "winapi 0.3.8",
-]
-
-[[package]]
 name = "match_cfg"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3030,6 +3023,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "memmap"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6585fd95e7bb50d6cc31e20d4cf9afb4e2ba16c5846fc76793f11218da9c475b"
+dependencies = [
+ "libc",
+ "winapi 0.3.8",
 ]
 
 [[package]]
