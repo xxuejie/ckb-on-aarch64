@@ -5,6 +5,7 @@ use ckb_types::core::TransactionView;
 use ckb_vm::{
     instructions::{extract_opcode, i, m, rvc, Instruction, Itype, Stype},
     registers::{RA, ZERO},
+    machine::VERSION0,
 };
 use ckb_vm_definitions::instructions as insts;
 use goblin::elf::{section_header::SHF_EXECINSTR, Elf};
@@ -105,7 +106,7 @@ impl<'a> IllScriptChecker<'a> {
         }
         let factories = [rvc::factory::<u64>, i::factory::<u64>, m::factory::<u64>];
         for factory in &factories {
-            if let Some(instruction) = factory(i) {
+            if let Some(instruction) = factory(i, VERSION0) {
                 return (Some(instruction), len);
             }
         }
