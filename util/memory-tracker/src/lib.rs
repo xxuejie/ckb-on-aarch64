@@ -1,12 +1,14 @@
 #[cfg(all(
     not(target_env = "msvc"),
     not(target_os = "macos"),
+    target_arch = "x86_64",
     feature = "profiling"
 ))]
 mod jemalloc;
 #[cfg(not(all(
     not(target_env = "msvc"),
     not(target_os = "macos"),
+    target_arch = "x86_64",
     feature = "profiling"
 )))]
 mod jemalloc {
@@ -17,9 +19,9 @@ mod jemalloc {
     }
 }
 
-#[cfg(all(not(target_env = "msvc"), not(target_os = "macos")))]
+#[cfg(all(not(target_env = "msvc"), not(target_os = "macos"), target_arch = "x86_64"))]
 mod process;
-#[cfg(not(all(not(target_env = "msvc"), not(target_os = "macos"))))]
+#[cfg(not(all(not(target_env = "msvc"), not(target_os = "macos"), target_arch = "x86_64")))]
 mod process {
     use ckb_logger::info;
 

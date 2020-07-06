@@ -1,7 +1,6 @@
 language: rust
 rust: 1.41.0
-dist: xenial
-sudo: true
+dist: bionic
 cache:
   directories:
     - $HOME/.cargo
@@ -11,164 +10,37 @@ git:
   depth: 2
   submodules: false
 
-env:
-  global:
-    - RUST_BACKTRACE=full
-    - CKB_CLI_VERSION=v0.33.1
-
 addons:
   apt:
     sources:
-      - sourceline: "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-8 main"
+      - sourceline: "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-9 main"
         key_url: "https://apt.llvm.org/llvm-snapshot.gpg.key"
     packages:
       - libssl-dev
-      - autoconf
-      - flex
-      - bison
-      - texinfo
-      - libtool
-      - clang-8
-      - libc6-dev-i386
+      - build-essential
+      - clang-9
+      - gcc-aarch64-linux-gnu
+      - g++-aarch64-linux-gnu
 
-before_script:
-  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then ulimit -n 8192; fi
-
-script: make test
-
-before_cache:
-  - rm -rf $HOME/.cargo/registry
+script:
+  - export TOP=$(pwd)
+  - curl -LO https://www.openssl.org/source/openssl-1.1.1.tar.gz
+  - tar -xzf openssl-1.1.1.tar.gz
+  - cd openssl-1.1.1
+  - CC=aarch64-linux-gnu-gcc ./Configure linux-aarch64 shared
+  - CC=aarch64-linux-gnu-gcc make
+  - cd ..
+  - export OPENSSL_LIB_DIR=$TOP/openssl-1.1.1
+  - export OPENSSL_INCLUDE_DIR=$TOP/openssl-1.1.1/include
+  - rustup target add aarch64-unknown-linux-gnu
+  - CC=gcc CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc cargo build --target=aarch64-unknown-linux-gnu --release
+  - if [ -n "$TRAVIS_TAG" ]; then cp target/aarch64-unknown-linux-gnu/release/ckb ./; tar czf ckb_aarch64_${TRAVIS_TAG}.tar.gz ckb ;fi
 
 deploy:
   provider: releases
   api_key: "$GITHUB_TOKEN"
   file:
-    - "releases/ckb_${TRAVIS_TAG}_${REL_PKG}"
-    - "releases/ckb_${TRAVIS_TAG}_${REL_PKG}.asc"
+    - "ckb_aarch64_${TRAVIS_TAG}.tar.gz"
   skip_cleanup: true
-  overwrite: true
-  prerelease: true
   on:
     tags: true
-    condition: '"$GITHUB_TOKEN" != "" && "$REL_PKG" != ""'
-
-if: 'type != pull_request or head_branch != develop'
-
-matrix:
-  allow_failures:
-    - rust: stable
-  include:
-    # We don't run tests, linters and quck check in fork branch, since they will be covered in PR.
-    - name: Tests on macOS
-      if: 'tag IS NOT present AND (type = pull_request OR branch IN (master, staging, staging2, trying))'
-      os: osx
-    - name: Tests on Linux
-      if: 'tag IS NOT present AND (type = pull_request OR branch IN (master, staging, staging2, trying) OR repo != nervosnetwork/ckb)'
-      os: linux
-    - name: PR Integration
-      if: 'tag IS NOT present AND branch != develop AND branch !~ /^rc\// AND (type = pull_request OR repo != nervosnetwork/ckb)'
-      os: linux
-      script: make CKB_TEST_SEC_COEFFICIENT=5 CKB_TEST_ARGS="--max-time 1200 -c 4" integration
-    - name: Linters
-      if: 'tag IS NOT present AND (type = pull_request OR branch in (master, staging, staging2, trying) OR repo != nervosnetwork/ckb)'
-      os: linux
-      install:
-        - cargo fmt --version || travis_retry rustup component add rustfmt
-        - cargo clippy --version || travis_retry rustup component add clippy
-      script:
-        - make fmt
-        - make clippy
-        - git diff --exit-code Cargo.lock
-    - name: Latest Linters
-      if: 'tag IS NOT present AND (type = pull_request OR branch in (master, staging, staging2, trying) OR repo != nervosnetwork/ckb)'
-      os: linux
-      rust: stable
-      cache: false
-      addons: { apt: { packages: [] } }
-      env:
-        - CLIPPY_OPTS="-D warnings -D clippy::clone_on_ref_ptr -D clippy::enum_glob_use -D clippy::fallible_impl_from"
-      install:
-        - rustup component add rustfmt --toolchain stable-x86_64-unknown-linux-gnu
-        - rustup component add clippy --toolchain stable-x86_64-unknown-linux-gnu
-      script:
-        - cargo +stable fmt --all -- --check
-        - cargo +stable clippy --all --all-targets --all-features -- ${CLIPPY_OPTS}
-    - name: Quick Check
-      if: 'tag IS NOT present AND (type = pull_request OR branch in (master, staging, staging2, trying) OR repo != nervosnetwork/ckb)'
-      os: linux
-      cache: false
-      addons: { apt: { packages: [] } }
-      script:
-        - make check-cargotoml
-        - make check-whitespaces
-        - make check-dirty-rpc-doc
-        - make check-dirty-hashes-toml
-    - name: Security Audit
-      if: 'tag IS NOT present AND (type = pull_request OR branch in (master, staging, staging2, trying) OR repo != nervosnetwork/ckb)'
-      os: linux
-      install:
-        - cargo audit --version || travis_retry cargo install cargo-audit --locked
-      script:
-        - make security-audit
-
-    - name: WASM build
-      if: 'tag IS NOT present AND (type = pull_request OR branch in (master, staging, staging2, trying) OR repo != nervosnetwork/ckb)'
-      os: linux
-      script:
-        - export PATH=/usr/lib/llvm-8/bin:$PATH
-        - rustup target add wasm32-unknown-unknown
-        - make wasm-build-test
-
-    - name: Test benchmarks on Linux
-      if: 'tag IS NOT present AND type != pull_request AND (branch IN (master, staging, staging2, trying) OR branch =~ /^rc\// OR (branch = develop AND commit_message !~ /^Merge #\d+/))'
-      os: linux
-      script: make bench-test
-    - name: Integration on macOS
-      if: 'tag IS NOT present AND type != pull_request AND (branch IN (master, staging, staging2, trying) OR branch =~ /^rc\// OR (branch = develop AND commit_message !~ /^Merge #\d+/))'
-      os: osx
-      script: make CKB_TEST_ARGS="--max-time 1200 -c 1" integration
-    - name: Integration on Linux
-      if: 'tag IS NOT present AND type != pull_request AND (branch IN (master, staging, staging2, trying) OR branch =~ /^rc\// OR (branch = develop AND commit_message !~ /^Merge #\d+/))'
-      os: linux
-      script: make CKB_TEST_ARGS="--max-time 1200 -c 1" integration
-    - name: Code Coverage
-      if: 'tag IS NOT present AND ((branch = master AND type != pull_request) OR head_branch =~ /^rc\//)'
-      os: linux
-      env: CACHE_NAME=tarpaulin
-      install:
-        - cargo tarpaulin --version || travis_retry cargo install cargo-tarpaulin --locked
-      script:
-        # allow failures
-        - if make cov; then bash <(curl -s https://codecov.io/bash); fi
-
-    - name: Package for macOS
-      if: 'tag IS present AND env(GITHUB_TOKEN) IS present'
-      os: osx
-      env: REL_PKG=x86_64-apple-darwin.zip
-      script:
-        - make OPENSSL_STATIC=1 OPENSSL_LIB_DIR=/usr/local/opt/openssl@1.1/lib OPENSSL_INCLUDE_DIR=/usr/local/opt/openssl@1.1/include prod
-        - openssl aes-256-cbc -K $encrypted_82dff4145bbf_key -iv $encrypted_82dff4145bbf_iv -in devtools/ci/travis-secret.asc.enc -out devtools/ci/travis-secret.asc -d
-        - gpg --import devtools/ci/travis-secret.asc
-        - devtools/ci/package.sh target/release/ckb
-    - name: Package for Linux
-      if: 'tag IS present AND env(GITHUB_TOKEN) IS present'
-      language: ruby
-      addons: { apt: { packages: [] } }
-      env: REL_PKG=x86_64-unknown-linux-gnu.tar.gz BUILDER_IMAGE=nervos/ckb-docker-builder:xenial-rust-1.41.0
-      script:
-        - mkdir -p $HOME/.cargo
-        - docker run --rm -it -w /ckb -v $(pwd):/ckb -v $HOME/.cargo:/root/.cargo -e OPENSSL_STATIC=1 -e OPENSSL_LIB_DIR=/usr/local/lib -e OPENSSL_INCLUDE_DIR=/usr/local/include/openssl $BUILDER_IMAGE make prod
-        - openssl aes-256-cbc -K $encrypted_82dff4145bbf_key -iv $encrypted_82dff4145bbf_iv -in devtools/ci/travis-secret.asc.enc -out devtools/ci/travis-secret.asc -d
-        - gpg --import devtools/ci/travis-secret.asc
-        - devtools/ci/package.sh target/release/ckb
-    - name: Package for Centos
-      if: 'tag IS present AND env(GITHUB_TOKEN) IS present'
-      language: ruby
-      addons: { apt: { packages: [] } }
-      env: REL_PKG=x86_64-unknown-centos-gnu.tar.gz BUILDER_IMAGE=nervos/ckb-docker-builder:centos-7-rust-1.41.0
-      script:
-        - mkdir -p $HOME/.cargo
-        - docker run --rm -it -w /ckb -v $(pwd):/ckb -v $HOME/.cargo:/root/.cargo $BUILDER_IMAGE scl enable llvm-toolset-7 'make prod'
-        - openssl aes-256-cbc -K $encrypted_82dff4145bbf_key -iv $encrypted_82dff4145bbf_iv -in devtools/ci/travis-secret.asc.enc -out devtools/ci/travis-secret.asc -d
-        - gpg --import devtools/ci/travis-secret.asc
-        - devtools/ci/package.sh target/release/ckb
