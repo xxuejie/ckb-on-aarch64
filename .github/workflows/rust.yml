@@ -1,0 +1,37 @@
+name: Rust
+
+on:
+  push:
+    branches: [ develop ]
+  pull_request:
+    branches: [ develop ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Add rust target
+      run: rustup target add aarch64-unknown-linux-gnu
+    - name: Add llvm deb key
+      run: wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
+    - name: Add llvm deb repository
+      run: sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-9 main"
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y libssl-dev build-essential clang-9 gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+    - name: Build and run
+      run: |
+          export TOP=$(pwd)
+          curl -LO https://www.openssl.org/source/openssl-1.1.1.tar.gz
+          tar -xzf openssl-1.1.1.tar.gz
+          cd openssl-1.1.1
+          CC=aarch64-linux-gnu-gcc ./Configure linux-aarch64 shared
+          CC=aarch64-linux-gnu-gcc make
+          cd ..
+          export OPENSSL_LIB_DIR=$TOP/openssl-1.1.1
+          export OPENSSL_INCLUDE_DIR=$TOP/openssl-1.1.1/include
+          CC=gcc CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc cargo build --target=aarch64-unknown-linux-gnu --release
