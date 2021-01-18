@@ -31,27 +31,31 @@ jobs:
           export OPENSSL_LIB_DIR=$TOP/openssl-1.1.1
           export OPENSSL_INCLUDE_DIR=$TOP/openssl-1.1.1/include
           CC=gcc CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc cargo build --target=aarch64-unknown-linux-gnu --release
+      # Reference: https://github.community/t/how-to-get-just-the-tag-name/16241/6
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
       - name: Package
         run: |
           cp target/aarch64-unknown-linux-gnu/release/ckb ./
-          tar czf ckb_aarch64_${{ github.ref }}.tar.gz ckb
+          tar czf ckb_aarch64_${{ steps.get_version.outputs.VERSION }}.tar.gz ckb
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
+          release_name: Release ${{ steps.get_version.outputs.VERSION }}
           draft: false
           prerelease: false
       - name: Upload Release Asset
-        id: upload-release-asset 
+        id: upload-release-asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-          asset_path: ./ckb_aarch64_${{ github.ref }}.tar.gz
-          asset_name: ckb_aarch64_${{ github.ref }}.tar.gz
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./ckb_aarch64_${{ steps.get_version.outputs.VERSION }}.tar.gz
+          asset_name: ckb_aarch64_${{ steps.get_version.outputs.VERSION }}.tar.gz
           asset_content_type: application/gzip
