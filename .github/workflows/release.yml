@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+    - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Add rust target
+        run: rustup target add aarch64-unknown-linux-gnu
+      - name: Add llvm deb key
+        run: wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
+      - name: Add llvm deb repository
+        run: sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-9 main"
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev build-essential clang-9 gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+      - name: Build and run
+        run: |
+          export TOP=$(pwd)
+          curl -LO https://www.openssl.org/source/openssl-1.1.1.tar.gz
+          tar -xzf openssl-1.1.1.tar.gz
+          cd openssl-1.1.1
+          CC=aarch64-linux-gnu-gcc ./Configure linux-aarch64 shared
+          CC=aarch64-linux-gnu-gcc make
+          cd ..
+          export OPENSSL_LIB_DIR=$TOP/openssl-1.1.1
+          export OPENSSL_INCLUDE_DIR=$TOP/openssl-1.1.1/include
+          CC=gcc CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc cargo build --target=aarch64-unknown-linux-gnu --release
+      - name: Package
+        run: |
+          cp target/aarch64-unknown-linux-gnu/release/ckb ./
+          tar czf ckb_aarch64_${{ github.ref }}.tar.gz ckb
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: ./ckb_aarch64_${{ github.ref }}.tar.gz
+          asset_name: ckb_aarch64_${{ github.ref }}.tar.gz
+          asset_content_type: application/gzip
